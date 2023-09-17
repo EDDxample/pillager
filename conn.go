@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/EDDxample/pillager/packet/dt"
@@ -11,8 +12,8 @@ import (
 type Connection struct {
 	connection      net.Conn
 	alive           bool
-	incomingPackets chan *[]byte
-	outgoingPackets chan *[]byte
+	incomingPackets chan []byte
+	outgoingPackets chan []byte
 }
 
 func NewConnection(hostname string) *Connection {
@@ -24,13 +25,26 @@ func NewConnection(hostname string) *Connection {
 	instance := &Connection{
 		connection:      conn,
 		alive:           true,
-		incomingPackets: make(chan *[]byte, 10),
-		outgoingPackets: make(chan *[]byte, 10),
+		incomingPackets: make(chan []byte, 50),
+		outgoingPackets: make(chan []byte, 10),
 	}
 
 	go instance.handleIncomingPackets()
 	go instance.handleOutgoingPackets()
 	return instance
+}
+
+func (c *Connection) GetHostPort() (string, int) {
+	host, portStr, err := net.SplitHostPort(c.connection.RemoteAddr().String())
+	if err != nil {
+		log.Fatal(err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return host, port
 }
 
 func (c *Connection) handleIncomingPackets() {
@@ -56,30 +70,29 @@ func (c *Connection) handleIncomingPackets() {
 		}
 
 		copy(packetBytes[:n+1], packetLength.Bytes())
-		c.incomingPackets <- &packetBytes
+		c.incomingPackets <- packetBytes
 	}
 	c.Close()
 }
 
 func (c *Connection) handleOutgoingPackets() {
-	keepAliveTicker := time.NewTicker(10 * time.Second)
+	// keepAliveTicker := time.NewTicker(10 * time.Second)
 	// var keepAlivePacket s2c.KeepAlive
 
 	for c.alive {
 		select {
 		case packet := <-c.outgoingPackets:
-			c.connection.Write(*packet)
+			c.connection.Write(packet)
 
-		case t := <-keepAliveTicker.C:
-			_ = t
-			// if c.state == PLAY {
-			// 	keepAlivePacket.KeepAliveID = dt.Long(t.UTC().UnixNano())
-			// 	c.connection.Write(keepAlivePacket.Bytes())
-			// }
+			// case t := <-keepAliveTicker.C:
+			// 	if c.state == PLAY {
+			// 		keepAlivePacket.KeepAliveID = dt.Long(t.UTC().UnixNano())
+			// 		c.connection.Write(keepAlivePacket.Bytes())
+			// 	}
 		}
 	}
 
-	keepAliveTicker.Stop()
+	// keepAliveTicker.Stop()
 }
 
 func (c *Connection) setTimeout() {

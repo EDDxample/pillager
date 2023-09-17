@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 )
 
@@ -17,16 +18,25 @@ func main() {
 	flag.Parse()
 	log.Printf("Raiding server %s with %d pillager(s)...\n", *host, *count)
 
-	clients := CreateClients(*host, *count)
-	<-handleInterrupt()
+	var wg sync.WaitGroup
+	wg.Add(*count)
+	clients := CreateClients(*host, *count, &wg)
+
+	wg.Add(*count)
+	<-handleInterrupt(&wg)
 	shutdown(clients)
 
 	log.Println("done")
 }
 
-func handleInterrupt() chan os.Signal {
+func handleInterrupt(wg *sync.WaitGroup) chan os.Signal {
 	endSignal := make(chan os.Signal, 2)
 	signal.Notify(endSignal, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		wg.Wait()
+		endSignal <- syscall.SIGINT
+	}()
+
 	return endSignal
 }
 
