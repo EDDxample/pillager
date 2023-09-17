@@ -17,6 +17,7 @@ type Connection struct {
 }
 
 func NewConnection(hostname string) *Connection {
+	hostname = ensurePort(hostname, "25565")
 	conn, err := net.Dial("tcp", hostname)
 	if err != nil {
 		log.Fatal(err)
@@ -32,6 +33,15 @@ func NewConnection(hostname string) *Connection {
 	go instance.handleIncomingPackets()
 	go instance.handleOutgoingPackets()
 	return instance
+}
+
+func ensurePort(host, defaultPort string) string {
+	if _, _, err := net.SplitHostPort(host); err != nil {
+		if addrErr, ok := err.(*net.AddrError); ok && addrErr.Err == "missing port in address" {
+			return net.JoinHostPort(host, defaultPort)
+		}
+	}
+	return host
 }
 
 func (c *Connection) GetHostPort() (string, int) {
