@@ -3,8 +3,8 @@ package c2s
 import (
 	"io"
 
-	"github.com/EDDxample/annoying_client/packet"
-	"github.com/EDDxample/annoying_client/packet/dt"
+	"github.com/EDDxample/pillager/packet"
+	"github.com/EDDxample/pillager/packet/dt"
 )
 
 type Handshake struct {

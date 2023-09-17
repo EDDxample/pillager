@@ -1,52 +1,92 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"net"
-	"os"
+	"time"
 
-	"github.com/EDDxample/annoying_client/packet/dt"
+	"github.com/EDDxample/pillager/packet/dt"
 )
 
 type Connection struct {
-	net.Conn
-	addr string
-	done chan os.Signal
+	connection      net.Conn
+	alive           bool
+	incomingPackets chan *[]byte
+	outgoingPackets chan *[]byte
 }
 
-func NewConnection(addr string, done chan os.Signal) *Connection {
-	return &Connection{addr: addr, done: done}
-}
-
-func (c *Connection) Start() error {
-	conn, err := net.Dial("tcp", c.addr)
+func NewConnection(hostname string) *Connection {
+	conn, err := net.Dial("tcp", hostname)
 	if err != nil {
-		return err
-	}
-	c.Conn = conn
-	return nil
-}
-
-func (c *Connection) ReadPacket() ([]byte, error) {
-	var length dt.VarInt
-	n, err := length.ReadFrom(c)
-	if err != nil {
-		fmt.Printf("Client disconnected: %s (Reason: %s)\n", c.RemoteAddr(), err)
-		return nil, err
+		log.Fatal(err)
 	}
 
-	buffer := make([]byte, n+int64(length))
-	br, err := c.Read(buffer[n:])
-	if err != nil || br == 0 {
-		if err != nil {
-			fmt.Printf("Client disconnected: %s (Reason: %s)\n", c.RemoteAddr(), err)
+	instance := &Connection{
+		connection:      conn,
+		alive:           true,
+		incomingPackets: make(chan *[]byte, 10),
+		outgoingPackets: make(chan *[]byte, 10),
+	}
+
+	go instance.handleIncomingPackets()
+	go instance.handleOutgoingPackets()
+	return instance
+}
+
+func (c *Connection) handleIncomingPackets() {
+	for c.alive {
+		c.setTimeout()
+
+		var packetLength dt.VarInt
+		n, err := packetLength.ReadFrom(c.connection)
+		if err != nil || n == 0 || packetLength == 0 {
+			if err != nil && c.alive {
+				log.Printf("Disconnected: %s (Reason: %s)\n", c.connection.RemoteAddr(), err)
+			}
+			break
 		}
-		return nil, err
+
+		packetBytes := make([]byte, n+int64(packetLength))
+		br, err := c.connection.Read(packetBytes[n:])
+		if err != nil || br == 0 {
+			if err != nil && c.alive {
+				log.Printf("Disconnected: %s (Reason: %s)\n", c.connection.RemoteAddr(), err)
+			}
+			break
+		}
+
+		copy(packetBytes[:n+1], packetLength.Bytes())
+		c.incomingPackets <- &packetBytes
 	}
-	copy(buffer[:n+1], length.Bytes())
-	return buffer, nil
+	c.Close()
+}
+
+func (c *Connection) handleOutgoingPackets() {
+	keepAliveTicker := time.NewTicker(10 * time.Second)
+	// var keepAlivePacket s2c.KeepAlive
+
+	for c.alive {
+		select {
+		case packet := <-c.outgoingPackets:
+			c.connection.Write(*packet)
+
+		case t := <-keepAliveTicker.C:
+			_ = t
+			// if c.state == PLAY {
+			// 	keepAlivePacket.KeepAliveID = dt.Long(t.UTC().UnixNano())
+			// 	c.connection.Write(keepAlivePacket.Bytes())
+			// }
+		}
+	}
+
+	keepAliveTicker.Stop()
+}
+
+func (c *Connection) setTimeout() {
+	c.connection.SetReadDeadline(time.Now().Add(10 * time.Second))
 }
 
 func (c *Connection) Close() {
-	c.Conn.Close()
+	c.alive = false
+	c.connection.Close()
 }

@@ -2,42 +2,37 @@ package main
 
 import (
 	"flag"
-	"fmt"
+	"log"
 	"os"
 	"os/signal"
-	"sync"
+	"syscall"
 )
 
 var (
-	serverHost  = flag.String("h", "localhost", "Server Host")
-	serverPort  = flag.Int("p", 25565, "Server Port")
-	clientCount = flag.Int("c", 1, "Annoying Client Count")
+	host  = flag.String("h", ":25565", "Server Hostname")
+	count = flag.Int("c", 1, "Pillager Count")
 )
 
 func main() {
 	flag.Parse()
-	hostName := fmt.Sprintf("%s:%d", *serverHost, *serverPort)
+	log.Printf("Raiding server %s with %d pillager(s)...\n", *host, *count)
 
-	// create wait group and interrupt handler
-	var wg sync.WaitGroup
-	wg.Add(*clientCount)
-	interruptHandler := make(chan os.Signal, 1)
-	signal.Notify(interruptHandler, os.Interrupt)
+	clients := CreateClients(*host, *count)
+	<-handleInterrupt()
+	shutdown(clients)
 
-	// generate clients
-	fmt.Println("generating", *clientCount, "clients...")
+	log.Println("done")
+}
 
-	clients, err := GenerateClients(*clientCount, hostName, interruptHandler)
-	if err != nil {
-		panic(err)
+func handleInterrupt() chan os.Signal {
+	endSignal := make(chan os.Signal, 2)
+	signal.Notify(endSignal, syscall.SIGINT, syscall.SIGTERM)
+	return endSignal
+}
+
+func shutdown(clients []*Client) {
+	for i := 0; i < len(clients); i++ {
+		clients[i].Close()
+		clients[i] = nil
 	}
-
-	// start clients
-	fmt.Println("connecting to", hostName, "...")
-
-	for _, client := range clients {
-		go client.Start(&wg)
-	}
-
-	wg.Wait()
 }

@@ -3,7 +3,7 @@ package packet
 import (
 	"io"
 
-	"github.com/EDDxample/annoying_client/packet/dt"
+	"github.com/EDDxample/pillager/packet/dt"
 )
 
 type PacketHeader struct {

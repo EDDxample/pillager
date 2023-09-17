@@ -1,5 +1,5 @@
 # Pillager
-Load testing tool for Minecraft servers that connects multiple headless clients to the target server.
+Load testing tool for Minecraft servers that spawns multiple villagers (headless clients) to raid the target server.
 
 ## Features
 - [x] Connect to offline, uncompressed servers (online-mode=false & network-compression-threshold=-1).

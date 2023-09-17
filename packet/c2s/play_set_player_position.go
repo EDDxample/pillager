@@ -1,8 +1,8 @@
 package c2s
 
 import (
-	"github.com/EDDxample/annoying_client/packet"
-	"github.com/EDDxample/annoying_client/packet/dt"
+	"github.com/EDDxample/pillager/packet"
+	"github.com/EDDxample/pillager/packet/dt"
 )
 
 type SetPlayerPositionPacket struct {
