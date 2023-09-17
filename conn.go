@@ -76,23 +76,12 @@ func (c *Connection) handleIncomingPackets() {
 }
 
 func (c *Connection) handleOutgoingPackets() {
-	// keepAliveTicker := time.NewTicker(10 * time.Second)
-	// var keepAlivePacket s2c.KeepAlive
-
 	for c.alive {
 		select {
 		case packet := <-c.outgoingPackets:
 			c.connection.Write(packet)
-
-			// case t := <-keepAliveTicker.C:
-			// 	if c.state == PLAY {
-			// 		keepAlivePacket.KeepAliveID = dt.Long(t.UTC().UnixNano())
-			// 		c.connection.Write(keepAlivePacket.Bytes())
-			// 	}
 		}
 	}
-
-	// keepAliveTicker.Stop()
 }
 
 func (c *Connection) setTimeout() {

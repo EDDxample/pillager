@@ -131,6 +131,8 @@ func (c *Client) handleIncomingPackets() {
 			switch packetID {
 			case 0x3C:
 				c.handleTeleportPacket(buffer)
+			case 0x23:
+				c.handleKeepAlivePacket(buffer)
 			}
 		default:
 			return
@@ -150,6 +152,13 @@ func (c *Client) handleTeleportPacket(reader io.Reader) {
 	c.spawned = true
 
 	response := c2s.SyncPlayerPosResponsePacket{TeleportID: packet.TeleportID}
+	c.conn.outgoingPackets <- response.Bytes()
+}
+
+func (c *Client) handleKeepAlivePacket(reader io.Reader) {
+	var packet s2c.KeepAlivePacket
+	packet.ReadPacket(reader)
+	response := c2s.KeepAlivePacket{KeepAliveID: packet.KeepAliveID}
 	c.conn.outgoingPackets <- response.Bytes()
 }
 
